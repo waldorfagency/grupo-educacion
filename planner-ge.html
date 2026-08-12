@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Calendario de contenidos 2026 · Grupo Educación</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; }
+body {
+  min-height: 100vh;
+  background: #FAFAF7;
+  color: #1C1C1A;
+  font-family: 'Inter', system-ui, sans-serif;
+  padding: 32px clamp(16px, 4vw, 56px) 48px;
+}
+
+/* Header */
+.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: 28px; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #8A8A80; margin-bottom: 8px; }
+h1 { font-family: 'Archivo', sans-serif; font-weight: 800; font-size: clamp(24px, 3.4vw, 38px); letter-spacing: -0.02em; line-height: 1.05; }
+.year { color: #8A8A80; font-weight: 500; }
+
+.modeToggle { display: flex; background: #ECECE6; border-radius: 999px; padding: 4px; }
+.modeToggle button {
+  border: 0; background: transparent; padding: 8px 18px; border-radius: 999px;
+  font: 600 13px 'Inter', sans-serif; color: #6B6B62; cursor: pointer; transition: all .18s ease;
+}
+.modeToggle button.on { background: #1C1C1A; color: #FAFAF7; }
+
+/* Months */
+.months { display: flex; gap: 4px; border-bottom: 2px solid #E4E4DC; margin-bottom: 20px; overflow-x: auto; }
+.mTab {
+  border: 0; background: transparent; cursor: pointer; padding: 10px 18px 12px;
+  font: 700 14px 'Archivo', sans-serif; letter-spacing: 0.08em; color: #9A9A90;
+  border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color .15s ease;
+  display: flex; align-items: center; gap: 8px;
+}
+.mTab:hover { color: #1C1C1A; }
+.mTab.active { color: #1C1C1A; border-color: #1C1C1A; }
+.mCount { font: 600 11px 'Inter', sans-serif; background: #ECECE6; border-radius: 999px; min-width: 20px; height: 20px; display: grid; place-items: center; padding: 0 6px; color: #6B6B62; }
+.mTab.active .mCount { background: #1C1C1A; color: #FAFAF7; }
+
+/* Filters */
+.filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+.fLabel { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8A8A80; margin-right: 4px; }
+.chip {
+  border: 1.5px solid #D8D8CE; background: #fff; border-radius: 999px; padding: 6px 13px;
+  font: 500 12.5px 'Inter', sans-serif; color: #3C3C36; cursor: pointer; transition: all .15s ease;
+}
+.chip b { font-weight: 700; margin-left: 4px; opacity: .55; }
+.chip:hover { border-color: #1C1C1A; }
+.chipOn { background: #1C1C1A; color: #FAFAF7; border-color: #1C1C1A; }
+.chipStatic { cursor: default; }
+
+/* Grid */
+.gridWrap { overflow-x: auto; }
+.grid {
+  display: grid;
+  grid-template-columns: 190px repeat(4, minmax(180px, 1fr));
+  gap: 8px;
+  min-width: 940px;
+}
+.corner {
+  font: 700 13px 'Archivo', sans-serif; letter-spacing: 0.1em; text-transform: uppercase;
+  display: flex; align-items: center; color: #1C1C1A; padding-left: 4px;
+}
+.weekHead {
+  background: #1C1C1A; color: #FAFAF7; border-radius: 8px; padding: 10px 14px;
+  font: 700 12px 'Archivo', sans-serif; letter-spacing: 0.14em; text-transform: uppercase;
+}
+.groupLabel {
+  grid-column: 1 / -1; font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: #A5A59A; padding: 14px 4px 2px;
+}
+.rowLabel {
+  display: flex; align-items: center; gap: 10px; border: 0; background: transparent;
+  font: 600 13.5px 'Inter', sans-serif; color: #1C1C1A; text-align: left; cursor: pointer;
+  padding: 6px 4px; border-radius: 8px; transition: opacity .2s ease;
+}
+.rowLabel:hover { background: #F0F0E8; }
+.rowLabel.dimRow { opacity: .3; }
+.dot { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; }
+
+.cell {
+  background: #F1F1EA; border-radius: 10px; min-height: 64px; padding: 6px;
+  display: flex; flex-direction: column; gap: 6px; position: relative;
+}
+.cellEdit:hover { outline: 2px dashed #C8C8BC; outline-offset: -2px; }
+
+.card {
+  border: 0; border-radius: 8px; padding: 10px 12px; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: 7px;
+  animation: pop .45s cubic-bezier(.2,.9,.3,1) both;
+  transition: transform .18s ease, box-shadow .18s ease, opacity .25s ease, filter .25s ease;
+  font-family: 'Inter', sans-serif;
+}
+.card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(28,28,26,.14); }
+.card.dim { opacity: .14; filter: grayscale(.9); pointer-events: none; }
+.cTitle { font: 700 13.5px/1.3 'Inter', sans-serif; }
+.cCanales { display: flex; flex-wrap: wrap; gap: 4px; }
+.cChip {
+  font: 600 10px 'Inter', sans-serif; letter-spacing: 0.03em; border: 1px solid;
+  border-radius: 999px; padding: 2px 8px; background: rgba(255,255,255,.35);
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: translateY(14px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.addBtn {
+  border: 1.5px dashed #C0C0B4; background: transparent; border-radius: 8px;
+  color: #A0A094; font-size: 16px; cursor: pointer; padding: 4px; min-height: 30px;
+  opacity: 0; transition: opacity .15s ease;
+}
+.cell:hover .addBtn { opacity: 1; }
+.addBtn:hover { border-color: #1C1C1A; color: #1C1C1A; }
+
+.empty { text-align: center; padding: 60px 20px; color: #8A8A80; font-size: 15px; }
+.emptyHint { font-size: 13px; margin-top: 6px; color: #B0B0A4; }
+
+.foot { margin-top: 40px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #B8B8AC; }
+
+.select {
+  appearance: none; -webkit-appearance: none;
+  border: 1.5px solid #D8D8CE; background: #fff; border-radius: 999px;
+  padding: 8px 36px 8px 15px; font: 500 13px 'Inter', sans-serif; color: #1C1C1A;
+  cursor: pointer; transition: border-color .15s ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%231C1C1A' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+}
+.select:hover, .select:focus { border-color: #1C1C1A; outline: none; }
+.select.active { background-color: #1C1C1A; color: #FAFAF7; border-color: #1C1C1A;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23FAFAF7' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.select option { background: #fff; color: #1C1C1A; }
+#selVertical { margin-left: 12px; }
+#btnClear { margin-left: 4px; }
+
+/* Drag and drop */
+.card.dragging { opacity: .35; }
+.cell.dropOver { outline: 2px solid #1C1C1A; outline-offset: -2px; background: #E8E8DE; }
+.mTab.dropOver { color: #1C1C1A; border-color: #1C1C1A; background: #ECECE6; border-radius: 8px 8px 0 0; }
+
+/* Modal */
+.overlay {
+  position: fixed; inset: 0; background: rgba(28,28,26,.45); backdrop-filter: blur(3px);
+  display: grid; place-items: center; padding: 20px; z-index: 50; animation: fade .2s ease;
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.sheet {
+  background: #FFFFFE; border-radius: 16px; width: 100%; max-width: 480px;
+  overflow: hidden; box-shadow: 0 24px 64px rgba(28,28,26,.25); animation: rise .28s cubic-bezier(.2,.9,.3,1);
+  max-height: 90vh; overflow-y: auto;
+}
+@keyframes rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.sheetHead { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; position: sticky; top: 0; }
+.sheetVertical { font: 700 12px 'Archivo', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; }
+.x { border: 0; background: transparent; font-size: 15px; cursor: pointer; padding: 4px; }
+.sheetBody { padding: 22px 24px 26px; display: flex; flex-direction: column; gap: 16px; }
+.sheetTitle { font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 22px; letter-spacing: -0.01em; }
+.sheetRow { display: flex; flex-direction: column; gap: 8px; }
+.sheetLabel { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8A8A80; }
+.sheetChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sheetNotes { font-size: 14px; line-height: 1.55; color: #3C3C36; }
+
+.fieldLabel { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8A8A80; margin-bottom: -8px; }
+.field {
+  border: 1.5px solid #D8D8CE; border-radius: 10px; padding: 11px 13px;
+  font: 500 14px 'Inter', sans-serif; color: #1C1C1A; background: #FCFCF9; width: 100%;
+}
+.field:focus { outline: 2px solid #1C1C1A; outline-offset: -1px; }
+.area { min-height: 80px; resize: vertical; font-family: 'Inter', sans-serif; }
+
+.actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.primary {
+  border: 0; background: #1C1C1A; color: #FAFAF7; border-radius: 999px; padding: 11px 22px;
+  font: 600 13.5px 'Inter', sans-serif; cursor: pointer; transition: opacity .15s ease;
+}
+.primary:disabled { opacity: .35; cursor: not-allowed; }
+.danger {
+  border: 1.5px solid #D8D8CE; background: transparent; color: #B4443C; border-radius: 999px;
+  padding: 11px 18px; font: 600 13.5px 'Inter', sans-serif; cursor: pointer;
+}
+.danger:hover { border-color: #B4443C; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .sheet, .overlay { animation: none !important; }
+  .card { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="eyebrow">Grupo Educación · Comunicación estratégica</div>
+    <h1>Calendario de contenidos <span class="year">2026</span></h1>
+  </div>
+  <div class="modeToggle" role="group" aria-label="Modo">
+    <button id="btnPres" class="on">Presentación</button>
+    <button id="btnEdit">Edición</button>
+  </div>
+</header>
+
+<nav class="months" id="months"></nav>
+<div class="filters">
+  <label class="fLabel" for="selCanal">Canal</label>
+  <select id="selCanal" class="select"></select>
+  <label class="fLabel" for="selVertical">Vertical</label>
+  <select id="selVertical" class="select"></select>
+  <button id="btnClear" class="chip" hidden>Limpiar filtros</button>
+</div>
+<div class="gridWrap"><div class="grid" id="grid"></div><div id="emptyBox"></div></div>
+<footer class="foot">The Waldorf Agency · Planeación de contenidos por vertical y canal</footer>
+<div id="modalRoot"></div>
+
+<script>
+// ---------- Config ----------
+const MONTHS = [
+  { id: "agosto", label: "AGO", full: "Agosto" },
+  { id: "septiembre", label: "SEP", full: "Septiembre" },
+  { id: "octubre", label: "OCT", full: "Octubre" },
+  { id: "noviembre", label: "NOV", full: "Noviembre" },
+  { id: "diciembre", label: "DIC", full: "Diciembre" },
+];
+
+const VERTICALES = [
+  { id: "grupo", name: "Grupo Educación", color: "#B6D7A8", ink: "#2C4A1E", group: "Verticales" },
+  { id: "redaprende", name: "Red Aprende", color: "#A4C2F4", ink: "#1E3A6E", group: "Verticales" },
+  { id: "fundaju", name: "Fundaju", color: "#F6B26B", ink: "#5C3A0A", group: "Verticales" },
+  { id: "habla", name: "HABLA", color: "#B4A7D6", ink: "#3A2C5E", group: "Verticales" },
+  { id: "base", name: "Base Inmobiliaria", color: "#6FA8DC", ink: "#123A5E", group: "Verticales" },
+  { id: "rse", name: "RSE", color: "#EA9999", ink: "#6E1E1E", group: "Transversales" },
+  { id: "marketing", name: "Marketing", color: "#D5A6BD", ink: "#5E2440", group: "Transversales" },
+];
+
+const CANALES = [
+  "RRSS", "PDC", "Pauta pagada", "Campaña", "Mailing", "Web", "Cobertura",
+  "Medios", "Newsletter", "Comunicado Interno", "Comunicado a colaboradores", "Comunicado Algebraix",
+];
+
+// ---------- Seed: datos del CSV actualizado ----------
+let seq = 0;
+const C = (vertical, week, title, canales, notas = "") => ({ id: "s" + (++seq), vertical, week, title, canales, notas });
+
+const SEED = {
+  agosto: [
+    C("grupo", 1, "Newsletter", ["Mailing"]),
+    C("grupo", 3, "Entrada LinkedIn co-dirección (HABLA)", ["RRSS"]),
+    C("grupo", 4, "Entrada LinkedIn (inicio ciclo escolar)", ["RRSS"]),
+    C("redaprende", 1, "Campaña nueva era deporte IAM", ["RRSS", "Comunicado Algebraix"]),
+    C("redaprende", 2, "RSE: IAM Huerto y jardín polinizador", ["PDC", "RRSS"]),
+    C("redaprende", 3, "Evento: Hagamos Red para docentes", ["Cobertura"], "12 al 21 de agosto. Cobertura para mapear contenidos."),
+    C("redaprende", 3, "RSE: Albertsons colecta PET", ["PDC", "RRSS"]),
+    C("redaprende", 4, "Evento: Hagamos Red para docentes", ["Cobertura"], "12 al 21 de agosto. Cobertura para mapear contenidos."),
+    C("redaprende", 4, "Cont. La Fuerza de Cada Colegio", ["Campaña"]),
+    C("fundaju", 1, "Torneo Jugando Juntos", ["Campaña"]),
+    C("fundaju", 2, "Campaña donativo predio Villahermosa", ["RRSS", "Web"]),
+    C("fundaju", 3, "Cápsulas Red Aprende", ["RRSS", "PDC"]),
+    C("fundaju", 4, "Evento Torneo Jugando Juntos", ["RRSS"]),
+    C("fundaju", 4, "Campaña donativo predio Villahermosa", ["RRSS", "Web"]),
+    C("habla", 1, "Curaduría de Contenido Estratégico", ["PDC", "RRSS"]),
+    C("habla", 2, "Contenido Coyuntural", ["PDC", "RRSS"]),
+    C("habla", 3, "Anuncio HABLA 2026", ["PDC", "RRSS", "Pauta pagada"]),
+    C("habla", 4, "Contenido Coyuntural", ["PDC", "RRSS"]),
+    C("habla", 4, "Campaña HABLA 2026 · Boletos", ["RRSS"]),
+    C("base", 1, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 2, "Sala de Juntas (TBD)", ["Comunicado a colaboradores"]),
+    C("base", 2, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 3, "Elevadores", ["Comunicado a colaboradores"]),
+    C("base", 3, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 4, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("rse", 1, "Seguimiento consumo energético (huella de carbono)", ["Comunicado Interno"]),
+    C("rse", 2, "ESR: IAM Huerto", ["PDC", "RRSS"]),
+    C("rse", 3, "ESR: Albertsons colecta PET", ["PDC", "RRSS"]),
+    C("marketing", 1, "Campaña Regreso a Clases", ["Pauta pagada", "RRSS"]),
+    C("marketing", 2, "Campaña Regreso a Clases", ["Pauta pagada", "RRSS"]),
+    C("marketing", 4, "Generación de campaña Cámbiate de Escuela", ["Pauta pagada", "RRSS"]),
+  ],
+  septiembre: [
+    C("grupo", 1, "Newsletter", ["Mailing"]),
+    C("redaprende", 1, "Sensibilización Diferenciadores", ["PDC", "RRSS"]),
+    C("redaprende", 1, "Comitiva Red Aprende en Finlandia", [], "12 al 21 de septiembre. Comitiva que representará a Red Aprende."),
+    C("redaprende", 1, "RSE: Alerce Conservación de especies endémicas y manglares", ["PDC", "RRSS"]),
+    C("redaprende", 2, "La Fuerza de Cada Colegio", ["Campaña"]),
+    C("redaprende", 2, "Campaña nueva era deporte IAM", ["RRSS"]),
+    C("redaprende", 3, "RSE: Bienestar animales de compañía", ["PDC", "RRSS"]),
+    C("redaprende", 3, "What The Future · Introducción", ["RRSS", "PDC"]),
+    C("redaprende", 4, "Sensibilización Diferenciadores", ["PDC", "RRSS"]),
+    C("fundaju", 1, "Resultados Torneo", ["RRSS"]),
+    C("fundaju", 1, "Testimonios campaña recaudación", ["RRSS", "Campaña"]),
+    C("fundaju", 2, "Recaudación", ["Campaña", "Pauta pagada"]),
+    C("habla", 1, "Campaña HABLA 2026 · Boletos", ["RRSS", "Pauta pagada"]),
+    C("habla", 2, "Campaña HABLA 2026 · Boletos", ["RRSS", "Pauta pagada"]),
+    C("habla", 3, "Campaña HABLA 2026 · Boletos", ["RRSS", "Pauta pagada"]),
+    C("habla", 4, "Campaña HABLA 2026 · Boletos", ["RRSS", "Pauta pagada"]),
+    C("base", 1, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 2, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 2, "CASC: Alberca / Natación", []),
+    C("base", 3, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 3, "Sitio San Ángel", ["Web"]),
+    C("base", 4, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 4, "Campaña San Ángel", ["Pauta pagada"]),
+    C("rse", 1, "ESR: Alerce Conservación de especies endémicas y manglares", ["PDC", "RRSS"]),
+    C("rse", 3, "ESR: CASC Bienestar animales de compañía", ["PDC", "RRSS"]),
+    C("marketing", 1, "Campaña Cámbiate de Escuela", ["Pauta pagada", "RRSS"]),
+    C("marketing", 2, "Campaña Cámbiate de Escuela", ["Pauta pagada", "RRSS"]),
+    C("marketing", 2, "CASC: Natación", []),
+    C("marketing", 4, "Generación: Campaña Open House", ["Pauta pagada", "RRSS"]),
+  ],
+  octubre: [
+    C("grupo", 1, "Newsletter", ["Mailing"]),
+    C("grupo", 1, "Semana del Docente", [], "Lunes 5 de octubre: Día del Docente."),
+    C("redaprende", 1, "Campaña nueva era deporte IAM", ["RRSS"]),
+    C("redaprende", 2, "Cont. La Fuerza de Cada Colegio", ["Campaña"]),
+    C("fundaju", 1, "Apoyo atracción de aliados", ["Web", "RRSS"]),
+    C("fundaju", 1, "Lanzamiento Cata con Causa", ["Campaña", "Pauta pagada"]),
+    C("fundaju", 4, "Cata con Causa", ["Campaña", "Pauta pagada"]),
+    C("fundaju", 4, "Campaña donativo predio Villahermosa", ["RRSS", "Web"]),
+    C("habla", 1, "Campaña HABLA 2026 · Boletos", ["RRSS", "Pauta pagada"]),
+    C("habla", 2, "Campaña HABLA 2026 · Boletos", ["RRSS", "Pauta pagada"]),
+    C("habla", 3, "Campaña HABLA 2026 · Boletos", ["RRSS", "Pauta pagada"]),
+    C("habla", 4, "Campaña HABLA 2026 · Boletos", ["RRSS", "Pauta pagada"]),
+    C("base", 1, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 1, "Campaña San Ángel", ["Pauta pagada"]),
+    C("base", 2, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 2, "Campaña San Ángel", ["Pauta pagada"]),
+    C("base", 3, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 3, "Campaña San Ángel", ["Pauta pagada"]),
+    C("base", 4, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 4, "Campaña San Ángel", ["Pauta pagada"]),
+    C("rse", 1, "Reportes Escuela Socialmente Responsable*", ["PDC", "RRSS", "Comunicado Algebraix", "Web"]),
+    C("rse", 3, "RSE: Acciones por vertical GE", ["RRSS", "PDC"]),
+    C("marketing", 1, "Campaña Open House", ["Pauta pagada", "RRSS"]),
+  ],
+  noviembre: [
+    C("grupo", 1, "Newsletter", ["Mailing"]),
+    C("grupo", 2, "Entrada LinkedIn co-dirección (post-HABLA)", ["RRSS"]),
+    C("redaprende", 1, "Evento: Mente en Juego", ["Cobertura", "RRSS", "PDC"]),
+    C("redaprende", 1, "Campaña nueva era deporte IAM", ["RRSS"]),
+    C("redaprende", 2, "Cont. La Fuerza de Cada Colegio", ["Campaña"]),
+    C("fundaju", 1, "Testimonios becas", ["RRSS"]),
+    C("fundaju", 1, "Cata con Causa", ["Campaña", "Pauta pagada"]),
+    C("fundaju", 1, "RSE: Acciones", ["PDC", "RRSS"]),
+    C("fundaju", 2, "Cata con Causa", ["Campaña", "Pauta pagada"]),
+    C("fundaju", 3, "Evento Cata con Causa / Reporte anual", ["Cobertura", "RRSS", "PDC"]),
+    C("fundaju", 4, "Publicación reporte", ["Web", "RRSS", "PDC"]),
+    C("habla", 1, "Evento: Mente en Juego", ["Cobertura", "RRSS", "PDC"]),
+    C("habla", 2, "Recap HABLA 2026", ["RRSS", "PDC"]),
+    C("habla", 4, "Contenido Coyuntural", ["PDC", "RRSS"]),
+    C("base", 1, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 1, "Campaña San Ángel", ["Pauta pagada"]),
+    C("base", 2, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 2, "Campaña San Ángel", ["Pauta pagada"]),
+    C("base", 3, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 3, "Campaña San Ángel", ["Pauta pagada"]),
+    C("base", 4, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 4, "Campaña San Ángel", ["Pauta pagada"]),
+    C("rse", 1, "RSE: Acciones por vertical FF", ["RRSS", "PDC"]),
+    C("rse", 3, "RSE: Acciones por vertical BI", ["RRSS", "PDC"]),
+    C("marketing", 1, "Noviembre Único", ["Pauta pagada", "RRSS"]),
+    C("marketing", 2, "Noviembre Único", ["Pauta pagada", "RRSS"]),
+    C("marketing", 3, "Noviembre Único", ["Pauta pagada", "RRSS"]),
+    C("marketing", 4, "Noviembre Único", ["Pauta pagada", "RRSS"]),
+  ],
+  diciembre: [
+    C("grupo", 1, "Newsletter", ["Mailing"]),
+    C("grupo", 3, "Entrada LinkedIn co-dirección (cierre de año)", ["RRSS"]),
+    C("redaprende", 1, "Campaña nueva era deporte IAM", ["RRSS"]),
+    C("redaprende", 2, "Cont. La Fuerza de Cada Colegio", ["Campaña"]),
+    C("fundaju", 2, "Agradecimiento aliados", ["RRSS"]),
+    C("habla", 1, "Contenido Coyuntural", ["PDC", "RRSS"]),
+    C("habla", 3, "Contenido Coyuntural", ["PDC", "RRSS"]),
+    C("base", 1, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 2, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 3, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("base", 4, "Campaña Campos Elíseos", ["Pauta pagada"]),
+    C("rse", 1, "Warm-up Reporte RSE", ["RRSS", "PDC"]),
+    C("rse", 2, "Warm-up Reporte RSE", ["RRSS", "PDC"]),
+    C("marketing", 1, "Promoción por definir", ["Pauta pagada", "RRSS"]),
+    C("marketing", 2, "Promoción por definir", ["Pauta pagada", "RRSS"]),
+    C("marketing", 3, "Promoción por definir", ["Pauta pagada", "RRSS"]),
+    C("marketing", 4, "Promoción por definir", ["Pauta pagada", "RRSS"]),
+  ],
+};
+
+// ---------- Storage adapter (Claude artifact / sitio web / memoria) ----------
+const STORAGE_KEY = "ge-calendario-v3";
+const store = {
+  async load() {
+    try {
+      if (window.storage) {
+        const r = await window.storage.get(STORAGE_KEY);
+        return r ? JSON.parse(r.value) : null;
+      }
+    } catch (e) { /* key inexistente */ }
+    try {
+      if (typeof localStorage !== "undefined") {
+        const r = localStorage.getItem(STORAGE_KEY);
+        return r ? JSON.parse(r) : null;
+      }
+    } catch (e) { /* sin localStorage */ }
+    return null;
+  },
+  async save(data) {
+    try {
+      if (window.storage) { await window.storage.set(STORAGE_KEY, JSON.stringify(data)); return; }
+    } catch (e) { console.error("Storage error", e); }
+    try {
+      if (typeof localStorage !== "undefined") localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) { console.error("Storage error", e); }
+  },
+};
+
+// ---------- State ----------
+let data = null;
+let month = "agosto";
+let mode = "presentacion";
+let canalFilter = null;
+let verticalFilter = null;
+let idCounter = 1000;
+let dragCard = null;
+
+// ---------- Helpers ----------
+const $ = (sel) => document.querySelector(sel);
+const el = (tag, cls, html) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (html !== undefined) n.innerHTML = html;
+  return n;
+};
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function persist() { await store.save(data); }
+const cards = () => data[month] || [];
+const isDim = (c) =>
+  (canalFilter && !c.canales.includes(canalFilter)) ||
+  (verticalFilter && c.vertical !== verticalFilter);
+
+// ---------- Render ----------
+function renderMonths() {
+  const nav = $("#months");
+  nav.innerHTML = "";
+  MONTHS.forEach((m) => {
+    const b = el("button", "mTab" + (month === m.id ? " active" : ""));
+    b.innerHTML = esc(m.label) + `<span class="mCount">${(data[m.id] || []).length || "·"}</span>`;
+    b.onclick = () => { month = m.id; canalFilter = null; verticalFilter = null; renderAll(); };
+    b.ondragover = (e) => { if (mode === "edicion" && dragCard && m.id !== month) { e.preventDefault(); b.classList.add("dropOver"); } };
+    b.ondragleave = () => b.classList.remove("dropOver");
+    b.ondrop = async (e) => {
+      e.preventDefault(); b.classList.remove("dropOver");
+      if (!dragCard || m.id === month) return;
+      const i = cards().findIndex((c) => c.id === dragCard);
+      if (i < 0) return;
+      const moved = data[month].splice(i, 1)[0];
+      data[m.id] = [...(data[m.id] || []), moved];
+      dragCard = null;
+      await persist(); renderAll();
+    };
+    nav.appendChild(b);
+  });
+}
+
+
+function renderFilterBar() {
+  const selC = $("#selCanal");
+  const selV = $("#selVertical");
+  const clear = $("#btnClear");
+
+  const canalesAZ = [...CANALES].sort((a, b) => a.localeCompare(b, "es"));
+  selC.innerHTML = `<option value="">Todos los canales</option>` + canalesAZ.map((c) => {
+    const n = cards().filter((x) => x.canales.includes(c)).length;
+    return `<option value="${esc(c)}">${esc(c)}${n ? " (" + n + ")" : ""}</option>`;
+  }).join("");
+  selC.value = canalFilter || "";
+  selC.classList.toggle("active", !!canalFilter);
+
+  const verticalesAZ = [...VERTICALES].sort((a, b) => a.name.localeCompare(b.name, "es"));
+  selV.innerHTML = `<option value="">Todas las verticales</option>` + verticalesAZ.map((v) => {
+    const n = cards().filter((x) => x.vertical === v.id).length;
+    return `<option value="${v.id}">${esc(v.name)}${n ? " (" + n + ")" : ""}</option>`;
+  }).join("");
+  selV.value = verticalFilter || "";
+  selV.classList.toggle("active", !!verticalFilter);
+
+  clear.hidden = !canalFilter && !verticalFilter;
+}
+$("#selCanal").onchange = (e) => { canalFilter = e.target.value || null; renderGrid(); renderFilterBar(); };
+$("#selVertical").onchange = (e) => { verticalFilter = e.target.value || null; renderGrid(); renderFilterBar(); };
+$("#btnClear").onclick = () => { canalFilter = null; verticalFilter = null; renderGrid(); renderFilterBar(); };
+
+function renderGrid() {
+  const grid = $("#grid");
+  grid.innerHTML = "";
+  const editable = mode === "edicion";
+  let stagger = 0;
+
+  grid.appendChild(el("div", "corner", esc(MONTHS.find((m) => m.id === month).full)));
+  [1, 2, 3, 4].forEach((w) => grid.appendChild(el("div", "weekHead", "Semana " + w)));
+
+  VERTICALES.forEach((v, vi) => {
+    if (vi === 0 || VERTICALES[vi - 1].group !== v.group) {
+      grid.appendChild(el("div", "groupLabel", esc(v.group)));
+    }
+    const rowDim = verticalFilter && verticalFilter !== v.id;
+    const label = el("button", "rowLabel" + (rowDim ? " dimRow" : ""));
+    label.innerHTML = `<span class="dot" style="background:${v.color}"></span>${esc(v.name)}`;
+    label.title = "Filtrar esta vertical";
+    label.onclick = () => { verticalFilter = verticalFilter === v.id ? null : v.id; renderGrid(); renderFilterBar(); };
+    grid.appendChild(label);
+
+    [1, 2, 3, 4].forEach((w) => {
+      const cell = el("div", "cell" + (editable ? " cellEdit" : ""));
+      if (editable) {
+        cell.ondragover = (e) => { if (dragCard) { e.preventDefault(); cell.classList.add("dropOver"); } };
+        cell.ondragleave = () => cell.classList.remove("dropOver");
+        cell.ondrop = async (e) => {
+          e.preventDefault(); cell.classList.remove("dropOver");
+          if (!dragCard) return;
+          const i = cards().findIndex((x) => x.id === dragCard);
+          if (i < 0) return;
+          data[month][i] = { ...data[month][i], vertical: v.id, week: w };
+          dragCard = null;
+          await persist(); renderGrid(); renderFilterBar();
+        };
+      }
+      cards().filter((c) => c.vertical === v.id && c.week === w).forEach((c) => {
+        const card = el("button", "card" + (isDim(c) || rowDim ? " dim" : ""));
+        card.style.background = v.color;
+        card.style.color = v.ink;
+        card.style.animationDelay = (stagger++ * 55) + "ms";
+        card.innerHTML =
+          `<span class="cTitle">${esc(c.title)}</span>` +
+          `<span class="cCanales">${c.canales.map((k) => `<span class="cChip" style="border-color:${v.ink}55">${esc(k)}</span>`).join("")}</span>`;
+        card.onclick = () => openModal(editable ? "edit" : "view", c);
+        if (editable) {
+          card.draggable = true;
+          card.ondragstart = (e) => { dragCard = c.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; };
+          card.ondragend = () => { dragCard = null; card.classList.remove("dragging"); };
+        }
+        cell.appendChild(card);
+      });
+      if (editable) {
+        const add = el("button", "addBtn", "+");
+        add.setAttribute("aria-label", `Agregar contenido, ${v.name}, semana ${w}`);
+        add.onclick = () => openModal("new", { vertical: v.id, week: w, title: "", canales: [], notas: "" });
+        cell.appendChild(add);
+      }
+      grid.appendChild(cell);
+    });
+  });
+
+  const emptyBox = $("#emptyBox");
+  emptyBox.innerHTML = "";
+  if (!cards().length) {
+    const e = el("div", "empty", `<p>Sin contenidos en ${MONTHS.find((m) => m.id === month).full.toLowerCase()} todavía.</p>` +
+      (mode === "presentacion" ? `<p class="emptyHint">Cambia a modo edición para agregar.</p>` : ""));
+    emptyBox.appendChild(e);
+  }
+}
+
+function renderAll() { renderMonths(); renderFilterBar(); renderGrid(); }
+
+// ---------- Modal ----------
+function openModal(type, base) {
+  const root = $("#modalRoot");
+  const v = VERTICALES.find((x) => x.id === base.vertical);
+  let title = base.title || "";
+  let canales = [...(base.canales || [])];
+  let notas = base.notas || "";
+
+  const overlay = el("div", "overlay");
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  const sheet = el("div", "sheet");
+  overlay.appendChild(sheet);
+
+  const close = () => { root.innerHTML = ""; };
+
+  function drawView() {
+    sheet.innerHTML = "";
+    sheet.appendChild(head());
+    const body = el("div", "sheetBody");
+    body.appendChild(el("h2", "sheetTitle", esc(base.title)));
+    const row = el("div", "sheetRow");
+    row.appendChild(el("span", "sheetLabel", "Canales"));
+    row.appendChild(el("div", "sheetChips", base.canales.map((c) => `<span class="chip chipStatic">${esc(c)}</span>`).join("")));
+    body.appendChild(row);
+    if (base.notas) {
+      const nr = el("div", "sheetRow");
+      nr.appendChild(el("span", "sheetLabel", "Notas"));
+      nr.appendChild(el("p", "sheetNotes", esc(base.notas)));
+      body.appendChild(nr);
+    }
+    sheet.appendChild(body);
+  }
+
+  function head() {
+    const h = el("div", "sheetHead");
+    h.style.background = v.color;
+    h.style.color = v.ink;
+    h.appendChild(el("span", "sheetVertical", `${esc(v.name)} · Semana ${base.week}`));
+    const x = el("button", "x", "✕");
+    x.style.color = v.ink;
+    x.setAttribute("aria-label", "Cerrar");
+    x.onclick = close;
+    h.appendChild(x);
+    return h;
+  }
+
+  function drawEdit(isNew) {
+    sheet.innerHTML = "";
+    sheet.appendChild(head());
+    const body = el("div", "sheetBody");
+
+    body.appendChild(el("label", "fieldLabel", "Título del contenido"));
+    const inTitle = el("input", "field");
+    inTitle.value = title;
+    inTitle.placeholder = "Ej. Newsletter mensual";
+    inTitle.oninput = () => { title = inTitle.value; refreshSave(); };
+    body.appendChild(inTitle);
+
+    body.appendChild(el("label", "fieldLabel", "Canales"));
+    const chipBox = el("div", "sheetChips");
+    const drawChips = () => {
+      chipBox.innerHTML = "";
+      CANALES.forEach((c) => {
+        const b = el("button", "chip" + (canales.includes(c) ? " chipOn" : ""), esc(c));
+        b.onclick = () => {
+          canales = canales.includes(c) ? canales.filter((x) => x !== c) : [...canales, c];
+          drawChips(); refreshSave();
+        };
+        chipBox.appendChild(b);
+      });
+    };
+    drawChips();
+    body.appendChild(chipBox);
+
+    body.appendChild(el("label", "fieldLabel", "Notas"));
+    const inNotas = el("textarea", "field area");
+    inNotas.value = notas;
+    inNotas.placeholder = "Detalle, responsable, estatus…";
+    inNotas.oninput = () => { notas = inNotas.value; };
+    body.appendChild(inNotas);
+
+    const actions = el("div", "actions");
+    if (!isNew) {
+      const del = el("button", "danger", "Eliminar");
+      del.onclick = async () => {
+        data[month] = cards().filter((c) => c.id !== base.id);
+        await persist(); close(); renderAll();
+      };
+      actions.appendChild(del);
+    }
+    const save = el("button", "primary", isNew ? "Agregar contenido" : "Guardar cambios");
+    const refreshSave = () => { save.disabled = !title.trim() || !canales.length; };
+    save.onclick = async () => {
+      if (isNew) {
+        data[month] = [...cards(), { id: "c" + Date.now() + "_" + idCounter++, vertical: base.vertical, week: base.week, title: title.trim(), canales, notas }];
+      } else {
+        const i = cards().findIndex((c) => c.id === base.id);
+        data[month][i] = { ...base, title: title.trim(), canales, notas };
+      }
+      await persist(); close(); renderAll();
+    };
+    refreshSave();
+    actions.appendChild(save);
+    body.appendChild(actions);
+    sheet.appendChild(body);
+    inTitle.focus();
+  }
+
+  if (type === "view") drawView();
+  else drawEdit(type === "new");
+  root.appendChild(overlay);
+}
+
+// ---------- Mode toggle ----------
+$("#btnPres").onclick = () => { mode = "presentacion"; $("#btnPres").classList.add("on"); $("#btnEdit").classList.remove("on"); renderGrid(); };
+$("#btnEdit").onclick = () => { mode = "edicion"; $("#btnEdit").classList.add("on"); $("#btnPres").classList.remove("on"); renderGrid(); };
+
+// ---------- Init ----------
+(async () => {
+  const saved = await store.load();
+  data = saved || JSON.parse(JSON.stringify(SEED));
+  renderAll();
+})();
+</script>
+</body>
+</html>
