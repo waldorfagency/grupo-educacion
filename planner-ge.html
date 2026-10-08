@@ -186,6 +186,34 @@ h1 { font-family: 'Archivo', sans-serif; font-weight: 800; font-size: clamp(24px
 }
 .danger:hover { border-color: #B4443C; }
 
+/* Estado de guardado / sincronización */
+.syncBar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: -14px 0 18px; min-height: 22px; }
+.lastEdit { font-size: 12px; color: #8A8A80; }
+.saveStatus { font: 600 12px 'Inter', sans-serif; color: #6B6B62; display: flex; align-items: center; gap: 8px; }
+.saveStatus:empty { display: none; }
+.saveStatus.ok { color: #3E7A2E; }
+.saveStatus.err { color: #B4443C; }
+.saveStatus .retry { border: 1.5px solid #B4443C; background: #fff; color: #B4443C; border-radius: 999px; padding: 3px 10px; font: 600 11.5px 'Inter', sans-serif; cursor: pointer; }
+.warnBox { background: #FFF6DA; border: 1px solid #F1D98A; color: #6E5410; border-radius: 10px; padding: 8px 14px; font-size: 12.5px; margin-bottom: 16px; }
+.warnBox[hidden] { display: none; }
+#btnExport { margin-left: auto; }
+
+/* Selects del modal */
+.moveRow { display: grid; grid-template-columns: 1.3fr 1fr 1.4fr; gap: 10px; }
+.moveRow label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8A8A80; }
+.fieldSelect { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%231C1C1A' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; text-transform: none; letter-spacing: 0; }
+.formErr { color: #B4443C; font-size: 13px; min-height: 18px; margin-top: -6px; }
+.ghost { border: 1.5px solid #D8D8CE; background: transparent; color: #3C3C36; border-radius: 999px; padding: 11px 18px; font: 600 13.5px 'Inter', sans-serif; cursor: pointer; }
+.ghost:hover { border-color: #1C1C1A; }
+.sheetText { font-size: 14px; line-height: 1.55; color: #3C3C36; }
+
+/* Aviso flotante */
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1C1C1A; color: #FAFAF7;
+  padding: 10px 18px; border-radius: 999px; font: 600 13px 'Inter', sans-serif; z-index: 60; animation: fade .2s ease; box-shadow: 0 10px 30px rgba(28,28,26,.25); }
+@media (max-width: 520px) { .moveRow { grid-template-columns: 1fr; } }
+
 @media (prefers-reduced-motion: reduce) {
   .card, .sheet, .overlay { animation: none !important; }
   .card { transition: none; }
@@ -204,6 +232,8 @@ h1 { font-family: 'Archivo', sans-serif; font-weight: 800; font-size: clamp(24px
     <button id="btnEdit">Edición</button>
   </div>
 </header>
+<div class="syncBar"><span class="lastEdit" id="lastEdit"></span><span class="saveStatus" id="saveStatus" role="status" aria-live="polite"></span></div>
+<div class="warnBox" id="warnBox" hidden></div>
 
 <nav class="months" id="months"></nav>
 <div class="filters">
@@ -212,12 +242,21 @@ h1 { font-family: 'Archivo', sans-serif; font-weight: 800; font-size: clamp(24px
   <label class="fLabel" for="selVertical">Vertical</label>
   <select id="selVertical" class="select"></select>
   <button id="btnClear" class="chip" hidden>Limpiar filtros</button>
+  <button id="btnExport" class="chip" title="Descargar el calendario completo en formato Excel (CSV)">Exportar CSV</button>
 </div>
 <div class="gridWrap"><div class="grid" id="grid"></div><div id="emptyBox"></div></div>
 <footer class="foot">The Waldorf Agency · Planeación de contenidos por vertical y canal</footer>
 <div id="modalRoot"></div>
 
 <script>
+// =====================================================================
+// ⚙️ CONFIGURACIÓN — CONEXIÓN CON LA HOJA DE GOOGLE
+// Pega entre las comillas la URL de tu Apps Script (la que termina en /exec).
+// Ejemplo de cómo debe quedar: 'https://script.google.com/macros/s/AKfy.../exec'
+// Si la dejas vacía (''), los cambios sólo se guardan en la computadora de quien edita.
+// =====================================================================
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwLyT9WEIFvF9tjlJF43IwSg5anDqpBH98VTmmwLwVWC-v4SIrVfYkRz8b4J7JnXVnFgw/exec';
+
 // ---------- Config ----------
 const MONTHS = [
   { id: "agosto", label: "AGO", full: "Agosto" },
@@ -387,9 +426,14 @@ const SEED = {
   ],
 };
 
-// ---------- Storage adapter (Claude artifact / sitio web / memoria) ----------
+// ---------- Storage adapter ----------
+// Con SCRIPT_URL: la hoja de Google es la fuente de verdad (todos ven lo mismo).
+// Sin SCRIPT_URL (o sin conexión): copia local en este navegador.
 const STORAGE_KEY = "ge-calendario-v3";
-const store = {
+const PIN_KEY = "ge-planner-pin";
+const EDITOR_KEY = "ge-planner-editor";
+
+const local = {
   async load() {
     try {
       if (window.storage) {
@@ -405,13 +449,60 @@ const store = {
     } catch (e) { /* sin localStorage */ }
     return null;
   },
-  async save(data) {
+  async save(d) {
     try {
-      if (window.storage) { await window.storage.set(STORAGE_KEY, JSON.stringify(data)); return; }
-    } catch (e) { console.error("Storage error", e); }
+      if (window.storage) { await window.storage.set(STORAGE_KEY, JSON.stringify(d)); return; }
+    } catch (e) { console.warn("Storage", e); }
     try {
-      if (typeof localStorage !== "undefined") localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) { console.error("Storage error", e); }
+      if (typeof localStorage !== "undefined") localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+    } catch (e) { console.warn("Storage", e); }
+  },
+};
+
+const remote = {
+  async get() {
+    const url = SCRIPT_URL + (SCRIPT_URL.includes("?") ? "&" : "?") + "t=" + Date.now();
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error((j && j.error) || "Respuesta inválida");
+    return j;
+  },
+  async post(payload) {
+    const r = await fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita la verificación CORS (preflight)
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  },
+};
+
+const store = {
+  // Devuelve { data, updatedAt, updatedBy, source: "remote" | "local" }
+  async load() {
+    if (SCRIPT_URL) {
+      try {
+        const j = await remote.get();
+        return { data: j.data || null, updatedAt: j.updatedAt || null, updatedBy: j.updatedBy || "", source: "remote" };
+      } catch (e) {
+        console.warn("No se pudo leer la hoja de Google:", e);
+      }
+    }
+    return { data: await local.load(), updatedAt: null, updatedBy: "", source: "local" };
+  },
+  // Devuelve { ok, updatedAt?, updatedBy?, conflict?, badPin?, error?, network? }
+  async save(d) {
+    if (!SCRIPT_URL) { await local.save(d); return { ok: true, local: true }; }
+    try {
+      const j = await remote.post({ action: "save", pin: auth.pin, editor: auth.editor, data: d, baseUpdatedAt: serverUpdatedAt });
+      return j || { ok: false, error: "Respuesta vacía" };
+    } catch (e) {
+      console.warn("No se pudo guardar en la hoja de Google:", e);
+      await local.save(d); // respaldo en este navegador
+      return { ok: false, network: true, error: String(e) };
+    }
   },
 };
 
@@ -424,6 +515,17 @@ let verticalFilter = null;
 let idCounter = 1000;
 let dragCard = null;
 
+let source = "local";          // de dónde vienen los datos mostrados
+let serverUpdatedAt = null;    // versión de la hoja que estamos viendo/editando
+let lastEditedBy = "";
+let saving = false, dirty = false, saveError = false, conflictOpen = false;
+const auth = {
+  get pin() { try { return sessionStorage.getItem(PIN_KEY) || ""; } catch (e) { return ""; } },
+  set pin(v) { try { v ? sessionStorage.setItem(PIN_KEY, v) : sessionStorage.removeItem(PIN_KEY); } catch (e) {} },
+  get editor() { try { return sessionStorage.getItem(EDITOR_KEY) || ""; } catch (e) { return ""; } },
+  set editor(v) { try { sessionStorage.setItem(EDITOR_KEY, v || ""); } catch (e) {} },
+};
+
 // ---------- Helpers ----------
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, html) => {
@@ -433,12 +535,156 @@ const el = (tag, cls, html) => {
   return n;
 };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const monthName = (id) => (MONTHS.find((m) => m.id === id) || { full: id }).full;
 
-async function persist() { await store.save(data); }
 const cards = () => data[month] || [];
 const isDim = (c) =>
   (canalFilter && !c.canales.includes(canalFilter)) ||
   (verticalFilter && c.vertical !== verticalFilter);
+
+function toast(msg) {
+  document.querySelectorAll(".toast").forEach((t) => t.remove());
+  const t = el("div", "toast", esc(msg));
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2800);
+}
+
+// ---------- Guardado ----------
+function setStatus(kind, text) {
+  const s = $("#saveStatus");
+  s.className = "saveStatus" + (kind === "ok" ? " ok" : kind === "err" ? " err" : "");
+  s.innerHTML = text ? esc(text) : "";
+  if (kind === "err") {
+    const b = el("button", "retry", "Reintentar");
+    b.onclick = () => { if (conflictOpen) return; dirty = true; runSave(); };
+    s.appendChild(b);
+  }
+}
+
+function renderLastEdit() {
+  const box = $("#lastEdit");
+  if (!serverUpdatedAt) { box.textContent = ""; return; }
+  const d = new Date(serverUpdatedAt);
+  const when = isNaN(d) ? serverUpdatedAt : d.toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
+  box.textContent = "Última edición: " + when + (lastEditedBy ? " · " + lastEditedBy : "");
+}
+
+function renderWarning() {
+  const w = $("#warnBox");
+  if (!SCRIPT_URL) {
+    w.textContent = "⚠️ Los cambios sólo se guardan en esta computadora (la página aún no está conectada a la hoja de Google).";
+    w.hidden = false;
+  } else if (source !== "remote") {
+    w.textContent = "⚠️ No se pudo conectar con la hoja de Google. Estás viendo la copia guardada en esta computadora; los cambios no se compartirán hasta que vuelva la conexión.";
+    w.hidden = false;
+  } else {
+    w.hidden = true;
+  }
+}
+
+// Todas las ediciones llaman persist(): guarda en segundo plano, una solicitud a la vez.
+function persist() { dirty = true; runSave(); }
+
+async function runSave() {
+  if (saving || conflictOpen) return;
+  saving = true;
+  try {
+    while (dirty) {
+      dirty = false;
+      setStatus("", "Guardando…");
+      const snapshot = clone(data);
+      const r = await store.save(snapshot);
+      if (r.ok) {
+        saveError = false;
+        if (r.local) { setStatus("ok", "Guardado en esta computadora"); continue; }
+        serverUpdatedAt = r.updatedAt || serverUpdatedAt;
+        lastEditedBy = r.updatedBy != null ? r.updatedBy : auth.editor;
+        source = "remote";
+        renderLastEdit(); renderWarning();
+        setStatus("ok", "Guardado");
+      } else if (r.conflict) {
+        saveError = true;
+        setStatus("err", "No guardado: hay una versión más reciente");
+        showConflict(r);
+        break;
+      } else if (r.badPin) {
+        saveError = true;
+        auth.pin = "";
+        setMode("presentacion");
+        setStatus("err", "Error al guardar: la clave ya no es válida");
+        toast("La clave de edición cambió. Vuelve a entrar a Edición.");
+        break;
+      } else {
+        saveError = true;
+        setStatus("err", "Error al guardar, reintenta");
+        if (r.error && !r.network) toast(r.error);
+        break;
+      }
+    }
+  } finally {
+    saving = false;
+  }
+}
+
+function showConflict(r) {
+  conflictOpen = true;
+  const root = $("#modalRoot");
+  root.innerHTML = "";
+  const overlay = el("div", "overlay");
+  const sheet = el("div", "sheet");
+  const when = r.updatedAt ? new Date(r.updatedAt).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" }) : "";
+  sheet.appendChild(darkHead("Cambios de otra persona", null));
+  const body = el("div", "sheetBody");
+  body.appendChild(el("h2", "sheetTitle", "Alguien más guardó cambios"));
+  body.appendChild(el("p", "sheetText",
+    `${r.updatedBy ? esc(r.updatedBy) : "Otra persona"} guardó el calendario${when ? " el " + esc(when) : ""}, después de que abriste esta página. ` +
+    "Para no borrar su trabajo, tu último cambio no se guardó. Carga la versión más reciente y vuelve a hacer tu cambio."));
+  const actions = el("div", "actions");
+  const later = el("button", "ghost", "Ahora no");
+  later.onclick = () => { conflictOpen = false; root.innerHTML = ""; };
+  const reload = el("button", "primary", "Cargar la versión más reciente");
+  reload.onclick = async () => {
+    reload.disabled = true; reload.textContent = "Cargando…";
+    conflictOpen = false; dirty = false;
+    await refreshFromServer(true);
+    root.innerHTML = "";
+    setStatus("", "");
+  };
+  actions.append(later, reload);
+  body.appendChild(actions);
+  sheet.appendChild(body);
+  overlay.appendChild(sheet);
+  root.appendChild(overlay);
+}
+
+// ---------- Actualización automática ----------
+let lastRefresh = 0;
+async function refreshFromServer(force) {
+  if (!SCRIPT_URL) return;
+  const idle = !saving && !dirty && !saveError && !conflictOpen && !dragCard && !$("#modalRoot").children.length;
+  if (!force && !idle) return;
+  lastRefresh = Date.now();
+  try {
+    const j = await remote.get();
+    if (!force && (saving || dirty || dragCard || $("#modalRoot").children.length)) return; // algo cambió mientras tanto
+    const changed = source !== "remote" || j.updatedAt !== serverUpdatedAt;
+    source = "remote";
+    serverUpdatedAt = j.updatedAt || null;
+    lastEditedBy = j.updatedBy || "";
+    saveError = false;
+    if (changed || force) {
+      data = j.data || clone(SEED);
+      renderAll();
+    }
+    renderLastEdit(); renderWarning();
+  } catch (e) {
+    console.warn("Actualización fallida:", e);
+  }
+}
+setInterval(() => { if (!document.hidden) refreshFromServer(false); }, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastRefresh > 5000) refreshFromServer(false); });
+window.addEventListener("focus", () => { if (Date.now() - lastRefresh > 5000) refreshFromServer(false); });
 
 // ---------- Render ----------
 function renderMonths() {
@@ -450,7 +696,7 @@ function renderMonths() {
     b.onclick = () => { month = m.id; canalFilter = null; verticalFilter = null; renderAll(); };
     b.ondragover = (e) => { if (mode === "edicion" && dragCard && m.id !== month) { e.preventDefault(); b.classList.add("dropOver"); } };
     b.ondragleave = () => b.classList.remove("dropOver");
-    b.ondrop = async (e) => {
+    b.ondrop = (e) => {
       e.preventDefault(); b.classList.remove("dropOver");
       if (!dragCard || m.id === month) return;
       const i = cards().findIndex((c) => c.id === dragCard);
@@ -458,7 +704,8 @@ function renderMonths() {
       const moved = data[month].splice(i, 1)[0];
       data[m.id] = [...(data[m.id] || []), moved];
       dragCard = null;
-      await persist(); renderAll();
+      renderAll(); persist();
+      toast(`Movido a ${m.full}`);
     };
     nav.appendChild(b);
   });
@@ -498,7 +745,7 @@ function renderGrid() {
   const editable = mode === "edicion";
   let stagger = 0;
 
-  grid.appendChild(el("div", "corner", esc(MONTHS.find((m) => m.id === month).full)));
+  grid.appendChild(el("div", "corner", esc(monthName(month))));
   [1, 2, 3, 4].forEach((w) => grid.appendChild(el("div", "weekHead", "Semana " + w)));
 
   VERTICALES.forEach((v, vi) => {
@@ -514,21 +761,23 @@ function renderGrid() {
 
     [1, 2, 3, 4].forEach((w) => {
       const cell = el("div", "cell" + (editable ? " cellEdit" : ""));
+      cell.dataset.vertical = v.id; cell.dataset.week = w;
       if (editable) {
         cell.ondragover = (e) => { if (dragCard) { e.preventDefault(); cell.classList.add("dropOver"); } };
         cell.ondragleave = () => cell.classList.remove("dropOver");
-        cell.ondrop = async (e) => {
+        cell.ondrop = (e) => {
           e.preventDefault(); cell.classList.remove("dropOver");
           if (!dragCard) return;
           const i = cards().findIndex((x) => x.id === dragCard);
           if (i < 0) return;
           data[month][i] = { ...data[month][i], vertical: v.id, week: w };
           dragCard = null;
-          await persist(); renderGrid(); renderFilterBar();
+          renderGrid(); renderFilterBar(); persist();
         };
       }
-      cards().filter((c) => c.vertical === v.id && c.week === w).forEach((c) => {
+      cards().filter((c) => c.vertical === v.id && Number(c.week) === w).forEach((c) => {
         const card = el("button", "card" + (isDim(c) || rowDim ? " dim" : ""));
+        card.dataset.id = c.id;
         card.style.background = v.color;
         card.style.color = v.ink;
         card.style.animationDelay = (stagger++ * 55) + "ms";
@@ -556,7 +805,7 @@ function renderGrid() {
   const emptyBox = $("#emptyBox");
   emptyBox.innerHTML = "";
   if (!cards().length) {
-    const e = el("div", "empty", `<p>Sin contenidos en ${MONTHS.find((m) => m.id === month).full.toLowerCase()} todavía.</p>` +
+    const e = el("div", "empty", `<p>Sin contenidos en ${esc(monthName(month).toLowerCase())} todavía.</p>` +
       (mode === "presentacion" ? `<p class="emptyHint">Cambia a modo edición para agregar.</p>` : ""));
     emptyBox.appendChild(e);
   }
@@ -565,19 +814,52 @@ function renderGrid() {
 function renderAll() { renderMonths(); renderFilterBar(); renderGrid(); }
 
 // ---------- Modal ----------
+function darkHead(text, onClose) {
+  const h = el("div", "sheetHead");
+  h.style.background = "#1C1C1A";
+  h.style.color = "#FAFAF7";
+  h.appendChild(el("span", "sheetVertical", esc(text)));
+  if (onClose) {
+    const x = el("button", "x", "✕");
+    x.style.color = "#FAFAF7";
+    x.setAttribute("aria-label", "Cerrar");
+    x.onclick = onClose;
+    h.appendChild(x);
+  }
+  return h;
+}
+
 function openModal(type, base) {
   const root = $("#modalRoot");
-  const v = VERTICALES.find((x) => x.id === base.vertical);
+  const fromMonth = month;
   let title = base.title || "";
   let canales = [...(base.canales || [])];
   let notas = base.notas || "";
+  let selMonth = fromMonth, selWeek = Number(base.week), selVertical = base.vertical;
 
   const overlay = el("div", "overlay");
   overlay.onclick = (e) => { if (e.target === overlay) close(); };
   const sheet = el("div", "sheet");
   overlay.appendChild(sheet);
 
-  const close = () => { root.innerHTML = ""; };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  const close = () => { root.innerHTML = ""; document.removeEventListener("keydown", onKey); };
+  document.addEventListener("keydown", onKey);
+
+  function head() {
+    const v = VERTICALES.find((x) => x.id === selVertical) || VERTICALES[0];
+    const h = el("div", "sheetHead");
+    h.style.background = v.color;
+    h.style.color = v.ink;
+    const monthTxt = selMonth !== fromMonth || type !== "view" ? ` · ${monthName(selMonth)}` : "";
+    h.appendChild(el("span", "sheetVertical", `${esc(v.name)} · Semana ${selWeek}${esc(monthTxt)}`));
+    const x = el("button", "x", "✕");
+    x.style.color = v.ink;
+    x.setAttribute("aria-label", "Cerrar");
+    x.onclick = close;
+    h.appendChild(x);
+    return h;
+  }
 
   function drawView() {
     sheet.innerHTML = "";
@@ -597,30 +879,39 @@ function openModal(type, base) {
     sheet.appendChild(body);
   }
 
-  function head() {
-    const h = el("div", "sheetHead");
-    h.style.background = v.color;
-    h.style.color = v.ink;
-    h.appendChild(el("span", "sheetVertical", `${esc(v.name)} · Semana ${base.week}`));
-    const x = el("button", "x", "✕");
-    x.style.color = v.ink;
-    x.setAttribute("aria-label", "Cerrar");
-    x.onclick = close;
-    h.appendChild(x);
-    return h;
+  function makeSelect(id, label, options, value, onChange) {
+    const wrap = el("label");
+    wrap.appendChild(document.createTextNode(label));
+    const s = el("select", "field fieldSelect");
+    s.id = id;
+    s.innerHTML = options.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+    s.value = String(value);
+    s.onchange = () => onChange(s.value);
+    wrap.appendChild(s);
+    return wrap;
   }
 
   function drawEdit(isNew) {
     sheet.innerHTML = "";
-    sheet.appendChild(head());
+    let headEl = head();
+    sheet.appendChild(headEl);
+    const redrawHead = () => { const h = head(); sheet.replaceChild(h, headEl); headEl = h; };
     const body = el("div", "sheetBody");
 
     body.appendChild(el("label", "fieldLabel", "Título del contenido"));
     const inTitle = el("input", "field");
+    inTitle.id = "inTitle";
     inTitle.value = title;
     inTitle.placeholder = "Ej. Newsletter mensual";
     inTitle.oninput = () => { title = inTitle.value; refreshSave(); };
     body.appendChild(inTitle);
+
+    // Mover: Mes / Semana / Vertical
+    const move = el("div", "moveRow");
+    move.appendChild(makeSelect("selMes", "Mes", MONTHS.map((m) => [m.id, m.full]), selMonth, (v) => { selMonth = v; redrawHead(); }));
+    move.appendChild(makeSelect("selSemana", "Semana", [1, 2, 3, 4].map((w) => [w, "Semana " + w]), selWeek, (v) => { selWeek = Number(v); redrawHead(); }));
+    move.appendChild(makeSelect("selVert", "Vertical", VERTICALES.map((v) => [v.id, v.name]), selVertical, (v) => { selVertical = v; redrawHead(); }));
+    body.appendChild(move);
 
     body.appendChild(el("label", "fieldLabel", "Canales"));
     const chipBox = el("div", "sheetChips");
@@ -648,28 +939,38 @@ function openModal(type, base) {
     const actions = el("div", "actions");
     if (!isNew) {
       const del = el("button", "danger", "Eliminar");
-      del.onclick = async () => {
-        data[month] = cards().filter((c) => c.id !== base.id);
-        await persist(); close(); renderAll();
+      del.onclick = () => {
+        data[fromMonth] = (data[fromMonth] || []).filter((c) => c.id !== base.id);
+        close(); renderAll(); persist();
       };
       actions.appendChild(del);
     }
     const save = el("button", "primary", isNew ? "Agregar contenido" : "Guardar cambios");
+    save.id = "btnSaveCard";
     const refreshSave = () => { save.disabled = !title.trim() || !canales.length; };
-    save.onclick = async () => {
+    save.onclick = () => {
+      const fields = { vertical: selVertical, week: selWeek, title: title.trim(), canales, notas };
       if (isNew) {
-        data[month] = [...cards(), { id: "c" + Date.now() + "_" + idCounter++, vertical: base.vertical, week: base.week, title: title.trim(), canales, notas }];
+        data[selMonth] = [...(data[selMonth] || []), { id: "c" + Date.now() + "_" + idCounter++, ...fields }];
       } else {
-        const i = cards().findIndex((c) => c.id === base.id);
-        data[month][i] = { ...base, title: title.trim(), canales, notas };
+        const list = data[fromMonth] || [];
+        const i = list.findIndex((c) => c.id === base.id);
+        const updated = { ...(i >= 0 ? list[i] : base), ...fields };
+        if (selMonth === fromMonth) {
+          if (i >= 0) list[i] = updated; else list.push(updated);
+        } else {
+          if (i >= 0) list.splice(i, 1);
+          data[selMonth] = [...(data[selMonth] || []), updated];
+        }
       }
-      await persist(); close(); renderAll();
+      close(); renderAll(); persist();
+      if (selMonth !== fromMonth) toast(`${isNew ? "Agregado" : "Movido"} a ${monthName(selMonth)} · Semana ${selWeek}`);
     };
     refreshSave();
     actions.appendChild(save);
     body.appendChild(actions);
     sheet.appendChild(body);
-    inTitle.focus();
+    setTimeout(() => inTitle.focus(), 0);
   }
 
   if (type === "view") drawView();
@@ -677,15 +978,152 @@ function openModal(type, base) {
   root.appendChild(overlay);
 }
 
+// ---------- Clave de edición ----------
+function askPin() {
+  return new Promise((resolve) => {
+    const root = $("#modalRoot");
+    root.innerHTML = "";
+    const overlay = el("div", "overlay");
+    const sheet = el("div", "sheet");
+    const done = (ok) => { root.innerHTML = ""; resolve(ok); };
+    sheet.appendChild(darkHead("Modo edición", () => done(false)));
+    const body = el("div", "sheetBody");
+    body.appendChild(el("h2", "sheetTitle", "Escribe la clave de edición"));
+    body.appendChild(el("label", "fieldLabel", "Clave"));
+    const inPin = el("input", "field");
+    inPin.id = "inPin"; inPin.type = "password"; inPin.autocomplete = "current-password";
+    body.appendChild(inPin);
+    body.appendChild(el("label", "fieldLabel", "Tu nombre (opcional)"));
+    const inName = el("input", "field");
+    inName.id = "inEditor"; inName.placeholder = "Para mostrar quién hizo la última edición";
+    inName.value = auth.editor;
+    body.appendChild(inName);
+    const err = el("p", "formErr");
+    err.id = "pinError";
+    body.appendChild(err);
+    const actions = el("div", "actions");
+    const cancel = el("button", "ghost", "Cancelar");
+    cancel.onclick = () => done(false);
+    const ok = el("button", "primary", "Entrar a edición");
+    ok.id = "btnPinOk";
+    const submit = async () => {
+      const pin = inPin.value.trim();
+      if (!pin) { err.textContent = "Escribe la clave."; inPin.focus(); return; }
+      ok.disabled = true; ok.textContent = "Verificando…"; err.textContent = "";
+      try {
+        const r = await remote.post({ action: "check", pin });
+        if (r && r.ok) {
+          auth.pin = pin; auth.editor = inName.value.trim();
+          done(true); return;
+        }
+        err.textContent = (r && r.error) || "Clave incorrecta.";
+      } catch (e) {
+        err.textContent = "No se pudo conectar con la hoja de Google. Revisa tu conexión e intenta de nuevo.";
+      }
+      ok.disabled = false; ok.textContent = "Entrar a edición";
+      inPin.select();
+    };
+    ok.onclick = submit;
+    [inPin, inName].forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); }));
+    overlay.onclick = (e) => { if (e.target === overlay) done(false); };
+    actions.append(cancel, ok);
+    body.appendChild(actions);
+    sheet.appendChild(body);
+    overlay.appendChild(sheet);
+    root.appendChild(overlay);
+    setTimeout(() => inPin.focus(), 0);
+  });
+}
+
 // ---------- Mode toggle ----------
-$("#btnPres").onclick = () => { mode = "presentacion"; $("#btnPres").classList.add("on"); $("#btnEdit").classList.remove("on"); renderGrid(); };
-$("#btnEdit").onclick = () => { mode = "edicion"; $("#btnEdit").classList.add("on"); $("#btnPres").classList.remove("on"); renderGrid(); };
+function setMode(m) {
+  mode = m;
+  $("#btnEdit").classList.toggle("on", m === "edicion");
+  $("#btnPres").classList.toggle("on", m === "presentacion");
+  renderGrid();
+}
+$("#btnPres").onclick = () => { setMode("presentacion"); refreshFromServer(false); };
+$("#btnEdit").onclick = async () => {
+  if (mode === "edicion") return;
+  if (SCRIPT_URL && !auth.pin) {
+    const ok = await askPin();
+    if (!ok) { setMode("presentacion"); return; }
+  }
+  setMode("edicion");
+  if (SCRIPT_URL) offerLocalCopy();
+};
+
+// Si la hoja todavía está vacía y en esta computadora hay cambios de la versión anterior
+// (guardados sólo en el navegador), ofrece subirlos como punto de partida.
+async function offerLocalCopy() {
+  if (source !== "remote" || serverUpdatedAt) return;
+  const saved = await local.load();
+  if (!saved || JSON.stringify(saved) === JSON.stringify(SEED) || JSON.stringify(saved) === JSON.stringify(data)) return;
+  const root = $("#modalRoot");
+  root.innerHTML = "";
+  const overlay = el("div", "overlay");
+  const sheet = el("div", "sheet");
+  const close = () => { root.innerHTML = ""; };
+  sheet.appendChild(darkHead("Cambios en esta computadora", close));
+  const body = el("div", "sheetBody");
+  body.appendChild(el("h2", "sheetTitle", "¿Subir tus cambios anteriores?"));
+  body.appendChild(el("p", "sheetText",
+    "En esta computadora hay cambios que hiciste con la versión anterior del planner (se guardaban sólo en este navegador). " +
+    "¿Quieres usarlos como punto de partida y guardarlos en la hoja para que todos los vean?"));
+  const actions = el("div", "actions");
+  const no = el("button", "ghost", "No, usar el calendario original");
+  no.onclick = close;
+  const yes = el("button", "primary", "Sí, subir mis cambios");
+  yes.id = "btnUseLocal";
+  yes.onclick = () => { data = saved; close(); renderAll(); persist(); toast("Tus cambios se están guardando en la hoja"); };
+  actions.append(no, yes);
+  body.appendChild(actions);
+  sheet.appendChild(body);
+  overlay.appendChild(sheet);
+  root.appendChild(overlay);
+}
+
+// ---------- Exportar CSV (formato del Excel original) ----------
+function buildCSV() {
+  const q = (s) => /[",\n\r]/.test(s) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s);
+  const rows = [];
+  MONTHS.forEach((m) => {
+    const list = data[m.id] || [];
+    rows.push([m.full.toUpperCase(), "", "", "", ""]);
+    rows.push(["", "SEMANA 1", "SEMANA 2", "SEMANA 3", "SEMANA 4"]);
+    VERTICALES.forEach((v) => {
+      const row = [v.name];
+      [1, 2, 3, 4].forEach((w) => {
+        row.push(list.filter((c) => c.vertical === v.id && Number(c.week) === w)
+          .map((c) => c.title + (c.canales && c.canales.length ? "\nCanal: " + c.canales.join(" / ") : ""))
+          .join("\n\n"));
+      });
+      rows.push(row);
+      rows.push(["", "", "", "", ""]);
+    });
+  });
+  return "\uFEFF" + rows.map((r) => r.map(q).join(",")).join("\r\n") + "\r\n";
+}
+$("#btnExport").onclick = () => {
+  const blob = new Blob([buildCSV()], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  const d = new Date();
+  const ymd = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  a.href = URL.createObjectURL(blob);
+  a.download = `calendario-contenidos-GE-${ymd}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
 
 // ---------- Init ----------
 (async () => {
-  const saved = await store.load();
-  data = saved || JSON.parse(JSON.stringify(SEED));
-  renderAll();
+  const r = await store.load();
+  source = r.source;
+  serverUpdatedAt = r.updatedAt;
+  lastEditedBy = r.updatedBy || "";
+  data = r.data || clone(SEED);
+  lastRefresh = Date.now();
+  renderAll(); renderLastEdit(); renderWarning();
 })();
 </script>
 </body>
